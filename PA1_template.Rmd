@@ -1,25 +1,85 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "PA1_Template"
+author: "Omkar"
+date: "21/06/2020"
+output:
+  pdf_document: default
+  html_document: default
 ---
 
+```{r loaddata}
+unzip(zipfile="activity.zip")
+activity <- read.csv("activity.csv")
+```
 
-## Loading and preprocessing the data
+```{r}
 
+library(lubridate)
 
+## Determine day of the week and categorize as weekend or weekday
+activity$date <- ymd(activity$date)
+activity$weekend <- as.factor(ifelse(weekdays(activity$date)=="Saturday" | weekdays(activity$date)=="Sunday","weekend","weekday"))
+activity$dayofweek <- as.factor(weekdays(activity$date))
+```
 
-## What is mean total number of steps taken per day?
+``` {r}
+##Generate histogram for total number of steps taken for each day
 
+library(dplyr)
+library(ggplot2)
 
+stepsByDay <- activity %>% group_by(date) %>% summarise(stepsperday = sum(steps,na.rm = TRUE))
+qplot(stepsperday,data=stepsByDay,na.rm=TRUE,binwidth=500,xlab='Total steps per day', ylab='Frequency using binwith 500',main = 'Histogram of the total number of steps taken each day')
+```
 
-## What is the average daily activity pattern?
+``` {r}
+library(dplyr)
+library(ggplot2)
 
+## Calculate mean and median steps taken for each day
+meanstepsperday <- stepsByDay %>% summarise(average = mean(stepsperday,na.rm = TRUE),median=median(stepsperday,na.rm = TRUE))
+meanstepsperday
 
+## Plot average daily activity pattern
+interval_average <- activity %>% group_by(interval) %>% summarise(average = mean(steps,na.rm = TRUE))
+qplot(interval,average,data=interval_average,geom="line",xlab = "5-minute intervals",ylab = "Average steps taken across all days")
 
-## Imputing missing values
+## Calculate interval which has max number of steps on average
+interval_average[which.max(interval_average$average),]
+```
 
+``` {r}
 
+library(dplyr)
+library(ggplot2)
 
-## Are there differences in activity patterns between weekdays and weekends?
+## Handling missing values
+## Dataset with no NAs
+activity_no_NA <- activity[which(!is.na(activity$steps)),]
+## Mean steps for each interval
+interval_only <- activity_no_NA %>% group_by(interval) %>% summarise(average=mean(steps))
+## Average to integer
+interval_only$average <- as.integer(interval_only$average)
+## Dataset where steps have NAs
+activity_na <- activity[which(is.na(activity$steps)),]
+## Replace NAs with average steps
+activity_na$steps <- ifelse(activity_na$interval==interval_only$interval,interval_only$average)
+## Binding data w/o NAs and data that had NAs 
+activity_impute <- rbind(activity_no_NA,activity_na)
+## Calculate number of missing values
+nrow(activity_na)
+
+## Plot steps taken per day after missing values handled
+stepsByDay_impute <- activity_impute %>% group_by(date) %>% summarise(stepsperday = sum(steps))
+qplot(stepsperday,data=stepsByDay_impute,na.rm=TRUE,binwidth=500,xlab='Total steps per day', ylab='Frequency using binwith 500',main = 'Histogram of the total number of steps taken each day')
+
+## Mean and median after missing handling
+totalstepsperday_impute <- activity_impute %>% group_by(date) %>% summarise(stepsperday = sum(steps))
+mean_n_median <- totalstepsperday_impute %>% summarise(average=mean(stepsperday),median=median(stepsperday))
+mean_n_median
+
+## Comparing patterns for weekdays and weekends
+meansteps <- activity_impute %>% group_by(interval,weekend) %>%   summarise(average = mean(steps))
+qplot(interval,average,data=meansteps,geom="line",facets=weekend~.,xlab="5-minute interval",ylab="average number of steps",main="Average steps pattern between Weekday and Weekend")
+
+```
